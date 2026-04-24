@@ -3,6 +3,37 @@ import websockets
 import json
 import random
 import urllib.request # Biblioteca nativa para fazer requisições na internet
+import socket
+import threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+
+def obter_ipv4_local():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+
+
+class HandlerHTTP(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/local-ip":
+            payload = json.dumps({"ip": obter_ipv4_local()}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+        super().do_GET()
+
+
+def iniciar_servidor_http():
+    servidor_http = ThreadingHTTPServer(("0.0.0.0", 8000), HandlerHTTP)
+    print("HTTP iniciado em http://0.0.0.0:8000 (index + /local-ip)")
+    servidor_http.serve_forever()
 
 jogadores_conectados = {} 
 jogadores_lista = []      
@@ -165,6 +196,9 @@ async def lidar_com_cliente(websocket):
                         else:
                             await websocket.send(json.dumps({"tipo": "erro_jogada", "mensagem": "Essa palavra não existe no dicionário português!"}))
 
+            elif dados.get("tipo") == "obter_ip_local":
+                await websocket.send(json.dumps({"tipo": "ip_local", "ip": obter_ipv4_local()}))
+
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
@@ -183,6 +217,7 @@ async def lidar_com_cliente(websocket):
 
 async def main():
     print("Servidor da Bomba iniciado! API de Dicionário ATIVADA.")
+    threading.Thread(target=iniciar_servidor_http, daemon=True).start()
     async with websockets.serve(lidar_com_cliente, "0.0.0.0", 8765):
         await asyncio.Future()
 

@@ -344,6 +344,72 @@
             margin: 20px auto;
         }
 
+        .qr-area {
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(91, 140, 214, 0.2);
+        }
+
+        .qr-title {
+            color: #9fc3ff;
+            font-size: 1em;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            margin-bottom: 10px;
+        }
+
+        .qr-subtitle {
+            color: #87aeea;
+            font-size: 0.9em;
+            margin-bottom: 12px;
+        }
+
+        #qr-canvas {
+            width: 180px;
+            height: 180px;
+            margin: 0 auto 10px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #url-mobile {
+            word-break: break-all;
+            color: #c8deff;
+            font-size: 0.92em;
+            margin-bottom: 10px;
+        }
+
+        .ip-fallback {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 8px;
+        }
+
+        .ip-fallback input {
+            margin: 0;
+            max-width: 180px;
+            text-align: center;
+            font-size: 1em;
+            padding: 8px 10px;
+            border-radius: 8px;
+        }
+
+        .btn-mini {
+            background: linear-gradient(135deg, #3a6db5, #4d86d8);
+            border: none;
+            color: #fff;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         /* ── Bomba animada no título ── */
         .bomb-shake {
             display: inline-block;
@@ -377,6 +443,16 @@
             <input type="text" id="nome-jogador" placeholder="Digite seu nome de guerreiro..." maxlength="20">
             <button class="btn-entrar" onclick="entrarNoJogo()">⚡ Entrar na Arena</button>
             <div id="status-conexao"></div>
+            <div class="qr-area">
+                <div class="qr-title">📱 Entrar pelo celular</div>
+                <div class="qr-subtitle">Escaneie o QR Code para abrir o jogo no navegador do seu celular.</div>
+                <div id="qr-canvas"></div>
+                <div id="url-mobile"></div>
+                <div class="ip-fallback">
+                    <input type="text" id="input-ip-manual" placeholder="Digite o IP manualmente">
+                    <button class="btn-mini" onclick="aplicarIpManual()">Atualizar</button>
+                </div>
+            </div>
             <div class="divider"></div>
         </div>
 
@@ -401,6 +477,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
     <script>
 
         const bg = document.getElementById("bombs-bg");
@@ -417,6 +494,162 @@
 
         let ws;
         let meuNome = "";
+        let urlMobileAtual = "";
+
+        function montarUrlMobile(ip) {
+            return `http://${ip}:8000/index.html`;
+        }
+
+        function renderizarQRCode(url) {
+            const canvas = document.getElementById("qr-canvas");
+            const label = document.getElementById("url-mobile");
+            canvas.innerHTML = "";
+            label.textContent = url;
+            urlMobileAtual = url;
+
+            if (window.QRCode && typeof QRCode.toCanvas === "function") {
+                QRCode.toCanvas(url, { width: 160, margin: 1 }, (erro, qrCanvas) => {
+                    if (erro) {
+                        console.error("Erro ao gerar QR Code (canvas):", erro);
+                        renderizarQrImagemFallback(canvas, url);
+                        return;
+                    }
+                    canvas.appendChild(qrCanvas);
+                });
+                return;
+            }
+
+            renderizarQrImagemFallback(canvas, url);
+        }
+
+        function renderizarQrImagemFallback(container, url) {
+            const img = document.createElement("img");
+            img.width = 160;
+            img.height = 160;
+            img.alt = "QR Code para acesso mobile";
+            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(url)}`;
+            img.onerror = () => {
+                container.textContent = "Não foi possível gerar o QR. Use a URL abaixo.";
+            };
+            container.appendChild(img);
+        }
+
+        async function detectarIPv4Local() {
+            const host = location.hostname;
+            const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+            if (ipv4Regex.test(host)) return host;
+
+            // Estratégia 1: pede ao servidor HTTP local o IPv4 real da máquina.
+            try {
+                const resp = await fetch("/local-ip", { cache: "no-store" });
+                if (resp.ok) {
+                    const dados = await resp.json();
+                    if (dados?.ip && ipv4Regex.test(dados.ip)) {
+                        return dados.ip;
+                    }
+                }
+            } catch (_) {}
+
+            // Estratégia 1.5: pede o IP via WebSocket (funciona mesmo sem /local-ip).
+            try {
+                const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+                const wsHost = location.hostname || "localhost";
+                const ipViaWs = await new Promise((resolve) => {
+                    const wsTemp = new WebSocket(`${wsProtocol}//${wsHost}:8765`);
+                    const timeout = setTimeout(() => {
+                        try { wsTemp.close(); } catch (_) {}
+                        resolve(null);
+                    }, 2500);
+
+                    wsTemp.onopen = () => {
+                        wsTemp.send(JSON.stringify({ tipo: "obter_ip_local" }));
+                    };
+
+                    wsTemp.onmessage = (evento) => {
+                        try {
+                            const dados = JSON.parse(evento.data);
+                            if (dados?.tipo === "ip_local" && ipv4Regex.test(dados.ip)) {
+                                clearTimeout(timeout);
+                                try { wsTemp.close(); } catch (_) {}
+                                resolve(dados.ip);
+                            }
+                        } catch (_) {}
+                    };
+
+                    wsTemp.onerror = () => {
+                        clearTimeout(timeout);
+                        try { wsTemp.close(); } catch (_) {}
+                        resolve(null);
+                    };
+                });
+
+                if (ipViaWs) return ipViaWs;
+            } catch (_) {}
+
+            // Estratégia 2 (fallback): tenta detectar via WebRTC quando abrir em localhost.
+            if (host === "localhost" || host === "127.0.0.1" || host === "") {
+                return new Promise((resolve) => {
+                    const RTCPeer = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+                    if (!RTCPeer) {
+                        resolve(null);
+                        return;
+                    }
+
+                    const pc = new RTCPeerConnection({ iceServers: [] });
+                    const timeout = setTimeout(() => {
+                        try { pc.close(); } catch (_) {}
+                        resolve(null);
+                    }, 2000);
+
+                    pc.createDataChannel("ip_probe");
+                    pc.onicecandidate = (evento) => {
+                        const candidate = evento.candidate?.candidate || "";
+                        const match = candidate.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+                        if (match) {
+                            const ip = match[1];
+                            if (ipv4Regex.test(ip) && ip !== "127.0.0.1") {
+                                clearTimeout(timeout);
+                                try { pc.close(); } catch (_) {}
+                                resolve(ip);
+                            }
+                        }
+                    };
+
+                    pc.createOffer()
+                        .then((offer) => pc.setLocalDescription(offer))
+                        .catch(() => {
+                            clearTimeout(timeout);
+                            try { pc.close(); } catch (_) {}
+                            resolve(null);
+                        });
+                });
+            }
+
+            return null;
+        }
+
+        async function inicializarQrMobile() {
+            let ip = await detectarIPv4Local();
+            if (!ip) {
+                const sugestao = "192.168.0.100";
+                renderizarQRCode(montarUrlMobile(sugestao));
+                document.getElementById("url-mobile").textContent =
+                    "Nao foi possivel detectar o IP automaticamente. Digite o IP manualmente abaixo.";
+                return;
+            }
+            renderizarQRCode(montarUrlMobile(ip));
+        }
+
+        function aplicarIpManual() {
+            const input = document.getElementById("input-ip-manual");
+            const ip = input.value.trim();
+            const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+            if (!ipv4Regex.test(ip)) {
+                alert("Digite um IPv4 válido. Ex: 192.168.1.10");
+                return;
+            }
+            renderizarQRCode(montarUrlMobile(ip));
+        }
 
         function mostrarStatus(mensagem) {
             document.getElementById("status-conexao").textContent = mensagem;
@@ -576,6 +809,8 @@
                 ul.appendChild(li);
             });
         }
+
+        inicializarQrMobile();
     </script>
 </body>
 </html>

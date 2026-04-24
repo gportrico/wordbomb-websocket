@@ -12,21 +12,19 @@ silaba_atual = ""
 tempo_restante = 15
 bomba_task = None
 
-# Nova variável para guardar as palavras já ditas na partida!
+# Variável para guardar as palavras já ditas na partida
 palavras_usadas = set() 
 
 silabas_disponiveis = ["CA", "MA", "PA", "BA", "LA", "DE", "RO", "TE", "VI", "NO", "SA", "TU", "DO", "FA", "GE"]
 
-# --- FUNÇÃO NOVA: Consulta à API ---
 def consultar_api_dicionario(palavra):
-    # A API do Dicionário Aberto retorna dados se a palavra existir, ou vazio [] se não existir
+    # A API do dicionário aberto retorna dados se a palavra existir ou vazio se não existir
     url = f"https://api.dicionario-aberto.net/word/{palavra.lower()}"
     try:
-        # Fazemos a requisição disfarçando de navegador para a API não bloquear
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=3) as resposta:
             dados = json.loads(resposta.read().decode('utf-8'))
-            # Se a lista tiver mais de 0 itens, a palavra existe
+            # Se a lista tiver mais de 0 itens a palavra existe
             return len(dados) > 0
     except Exception as e:
         print(f"Erro na API ou palavra não encontrada: {e}")
@@ -132,7 +130,7 @@ async def lidar_com_cliente(websocket):
                 if not jogo_em_andamento and len(jogadores_lista) >= 2:
                     jogo_em_andamento = True
                     turno_atual_index = 0 
-                    palavras_usadas.clear() # Limpa as palavras usadas da partida anterior!
+                    palavras_usadas.clear() # Limpa as palavras usadas da partida anterior
                     await enviar_nova_rodada()
                     bomba_task = asyncio.create_task(loop_da_bomba())
                 elif len(jogadores_lista) < 2:
@@ -146,31 +144,25 @@ async def lidar_com_cliente(websocket):
                     
                     if websocket == ws_da_vez:
                         palavra = dados.get("palavra", "").upper()
-                        
-                        # --- NOVA LÓGICA DE VALIDAÇÃO ---
-                        
-                        # 1. Verifica se a sílaba está na palavra
+
                         if silaba_atual not in palavra:
                             await websocket.send(json.dumps({"tipo": "erro_jogada", "mensagem": f"A palavra precisa conter a sílaba {silaba_atual}!"}))
-                            continue # Para a verificação por aqui
+                            continue 
                             
-                        # 2. Verifica se a palavra já foi usada nesta partida
                         if palavra in palavras_usadas:
                             await websocket.send(json.dumps({"tipo": "erro_jogada", "mensagem": "Essa palavra já foi usada nesta partida!"}))
                             continue
-                            
-                        # 3. Verifica no Dicionário da Internet (rodando em uma thread separada para não travar a bomba!)
+
                         palavra_existe = await asyncio.to_thread(consultar_api_dicionario, palavra)
                         
                         if palavra_existe:
-                            # Tudo certo! Aceita a palavra
+
                             palavras_usadas.add(palavra) # Guarda a palavra no set
                             print(f"Acertou! {jogadores_conectados[websocket]} digitou {palavra} (Palavra válida!)")
                             
                             turno_atual_index = (turno_atual_index + 1) % len(jogadores_lista)
                             await enviar_nova_rodada() 
                         else:
-                            # A palavra não existe no dicionário
                             await websocket.send(json.dumps({"tipo": "erro_jogada", "mensagem": "Essa palavra não existe no dicionário português!"}))
 
     except websockets.exceptions.ConnectionClosed:

@@ -1,133 +1,420 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bomba de Palavras</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: sans-serif;
+            font-family: 'Rajdhani', sans-serif;
             text-align: center;
-            margin-top: 50px;
-            background-color: #f4f4f9;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #020b18 0%, #061a35 40%, #0a2550 70%, #061a35 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 10s ease infinite;
+            color: #e0eaff;
+            overflow-x: hidden;
         }
 
-        #tela-lobby,
-        #tela-partida {
-            display: none;
+        @keyframes gradientShift {
+            0%   { background-position: 0% 50%; }
+            50%  { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
 
-        ul {
-            list-style-type: none;
-            padding: 0;
+        .bombs-bg {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
         }
 
-        li {
+        .bomb-float {
+            position: absolute;
+            font-size: 2.5rem;
+            opacity: 0.08;
+            animation: floatBomb linear infinite;
+        }
+
+        @keyframes floatBomb {
+            0%   { transform: translateY(110vh) rotate(0deg);   opacity: 0; }
+            10%  { opacity: 0.08; }
+            90%  { opacity: 0.08; }
+            100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.8em;
+            font-weight: 900;
+            letter-spacing: 4px;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 0 20px rgba(255, 80, 0, 0.5));
+        }
+
+        .titulo-texto {
+            background: linear-gradient(90deg, #ff4444, #ff9900, #ff4444);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 3s linear infinite;
+        }
+
+        .subtitle {
+            font-size: 1em;
+            color: #5b8cd6;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+        }
+
+        @keyframes shimmer {
+            to { background-position: 200% center; }
+        }
+
+        /* ── Card de tela ── */
+        .card {
+            background: rgba(6, 26, 60, 0.75);
+            border: 1px solid rgba(91, 140, 214, 0.25);
+            border-radius: 20px;
+            padding: 40px 50px;
+            width: 100%;
+            max-width: 480px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(30, 80, 180, 0.1);
+        }
+
+        #tela-lobby, #tela-partida { display: none; }
+
+        /* ── Inputs ── */
+        input[type="text"] {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(91, 140, 214, 0.4);
+            border-radius: 12px;
+            color: #e0eaff;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.1em;
+            font-weight: 600;
+            padding: 12px 18px;
+            width: 100%;
+            margin-bottom: 16px;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        input[type="text"]::placeholder { color: rgba(150, 180, 230, 0.4); }
+
+        input[type="text"]:focus {
+            border-color: #4d9eff;
+            box-shadow: 0 0 0 3px rgba(77, 158, 255, 0.15);
+        }
+
+        #input-palavra {
+            text-transform: uppercase;
+            font-size: 1.3em;
+            letter-spacing: 3px;
+            text-align: center;
+        }
+
+        .btn-entrar {
+            background: linear-gradient(135deg, #1565c0, #1976d2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 13px 30px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.1em;
+            font-weight: 700;
+            letter-spacing: 1px;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.15s, box-shadow 0.3s;
+            box-shadow: 0 4px 20px rgba(25, 118, 210, 0.4);
+        }
+
+        .btn-entrar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 28px rgba(25, 118, 210, 0.6);
+        }
+
+        .btn-entrar:active { transform: translateY(0); }
+
+        #btn-iniciar {
+            position: relative;
+            background: linear-gradient(135deg, #1b8a2e, #27ae60, #1b8a2e);
+            background-size: 200% 200%;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 14px 40px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1em;
+            font-weight: 700;
+            letter-spacing: 2px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.15s, box-shadow 0.3s;
+            animation: greenPulse 2.5s ease infinite;
+            box-shadow: 0 0 20px rgba(39, 174, 96, 0.5), 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        @keyframes greenPulse {
+            0%   { background-position: 0% 50%;   box-shadow: 0 0 20px rgba(39,174,96,0.5), 0 4px 15px rgba(0,0,0,0.3); }
+            50%  { background-position: 100% 50%;  box-shadow: 0 0 35px rgba(39,174,96,0.8), 0 6px 25px rgba(0,0,0,0.4); }
+            100% { background-position: 0% 50%;   box-shadow: 0 0 20px rgba(39,174,96,0.5), 0 4px 15px rgba(0,0,0,0.3); }
+        }
+
+        #btn-iniciar:hover {
+            transform: translateY(-3px) scale(1.04);
+        }
+
+        #btn-iniciar:active { transform: scale(0.97); }
+
+        #btn-enviar {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 28px;
+            font-family: 'Rajdhani', sans-serif;
             font-size: 1.2em;
-            margin: 5px 0;
-            color: #333;
+            font-weight: 700;
+            letter-spacing: 1px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: transform 0.15s, box-shadow 0.3s;
+            box-shadow: 0 4px 16px rgba(231, 76, 60, 0.4);
         }
 
-        .silaba-destaque {
-            font-size: 5em;
-            font-weight: bold;
-            color: #d32f2f;
-            margin: 10px 0;
+        #btn-enviar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(231, 76, 60, 0.6);
+        }
+
+        /* ── Lista de jogadores ── */
+        h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1em;
+            letter-spacing: 2px;
+            color: #5b8cd6;
+            margin-bottom: 18px;
             text-transform: uppercase;
         }
 
-        .vez-texto {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #1976d2;
+        ul { list-style: none; padding: 0; margin-bottom: 6px; }
+
+        li {
+            font-size: 1.15em;
+            font-weight: 600;
+            color: #c8deff;
+            background: rgba(77, 130, 220, 0.08);
+            border: 1px solid rgba(77, 130, 220, 0.15);
+            border-radius: 10px;
+            padding: 10px 18px;
+            margin: 6px 0;
+            transition: background 0.2s;
         }
 
-        #btn-iniciar {
-            padding: 10px 20px;
-            font-size: 1.1em;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-            margin-top: 15px;
-        }
+        li:hover { background: rgba(77, 130, 220, 0.15); }
 
-        /* Estilo do relógio da bomba */
         #relogio-bomba {
-            font-size: 3em;
-            font-weight: bold;
-            color: #333;
-            margin: 20px 0;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3.5em;
+            font-weight: 900;
+            color: #c8deff;
+            margin: 10px 0 20px;
+            transition: color 0.3s;
+            filter: drop-shadow(0 0 8px rgba(100,160,255,0.3));
         }
 
         .bomba-perigo {
-            color: red !important;
+            color: #ff4444 !important;
+            filter: drop-shadow(0 0 16px rgba(255, 60, 60, 0.8)) !important;
             animation: piscar 0.5s infinite;
         }
 
-        @keyframes piscar {
-            50% {
-                opacity: 0.5;
-            }
+        @keyframes piscar { 50% { opacity: 0.4; } }
+
+        .silaba-destaque {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 5em;
+            font-weight: 900;
+            background: linear-gradient(90deg, #ff4444, #ff9900);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 20px rgba(255, 100, 0, 0.6));
+            animation: silabaPulse 1.5s ease-in-out infinite;
+            margin: 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+        }
+
+        @keyframes silabaPulse {
+            0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 100, 0, 0.6)); }
+            50%       { filter: drop-shadow(0 0 36px rgba(255, 100, 0, 0.9)); }
+        }
+
+        .vez-texto {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: #5b8cd6;
+            margin-bottom: 6px;
+            letter-spacing: 1px;
+        }
+
+        #status-conexao {
+            color: #ff6b6b;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-top: 12px;
+            min-height: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        #mensagem-erro {
+            color: #ff6b6b;
+            font-weight: 700;
+            font-size: 1em;
+            margin: 10px 0;
+            min-height: 22px;
+            letter-spacing: 0.5px;
+        }
+
+        .erro-flash {
+            animation: erroFlash 0.4s ease;
+        }
+
+        @keyframes erroFlash {
+            0%   { transform: scale(1);    color: #ff6b6b; }
+            25%  { transform: scale(1.12); color: #ff2222; }
+            50%  { transform: scale(0.97); color: #ff6b6b; }
+            75%  { transform: scale(1.06); color: #ff2222; }
+            100% { transform: scale(1);    color: #ff6b6b; }
+        }
+
+        .input-shake {
+            animation: inputShake 0.4s ease;
+        }
+
+        @keyframes inputShake {
+            0%,100% { transform: translateX(0); border-color: rgba(91,140,214,0.4); }
+            15%     { transform: translateX(-8px); border-color: #ff3333; box-shadow: 0 0 12px rgba(255,50,50,0.5); }
+            30%     { transform: translateX(8px);  border-color: #ff3333; }
+            45%     { transform: translateX(-6px); border-color: #ff3333; }
+            60%     { transform: translateX(6px);  border-color: #ff3333; }
+            75%     { transform: translateX(-3px); border-color: #ff3333; }
+            90%     { transform: translateX(3px);  border-color: #ff3333; }
         }
 
         #area-jogo {
             margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0;
         }
 
-        #input-palavra {
-            padding: 10px;
-            font-size: 1.2em;
-            text-transform: uppercase;
-            width: 200px;
+        #area-jogo input { margin-bottom: 0; width: 200px; border-radius: 12px 0 0 12px; border-right: none; height: 50px; }
+        #btn-enviar { border-radius: 0 12px 12px 0; margin-left: 0; height: 50px; padding-top: 0; padding-bottom: 0; }
+
+        /* ── Separador ── */
+        .divider {
+            width: 60px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #2a5298, transparent);
+            margin: 20px auto;
         }
 
-        #btn-enviar {
-            padding: 10px 20px;
-            font-size: 1.2em;
-            cursor: pointer;
+        /* ── Bomba animada no título ── */
+        .bomb-shake {
+            display: inline-block;
+            animation: bombShake 2s ease-in-out infinite, bombGlow 3s linear infinite;
         }
 
-        #mensagem-erro {
-            color: red;
-            font-weight: bold;
-            margin-top: 10px;
-            min-height: 20px;
+        @keyframes bombShake {
+            0%, 100% { transform: rotate(-8deg) scale(1); }
+            25%       { transform: rotate(8deg) scale(1.1); }
+            50%       { transform: rotate(-5deg) scale(1); }
+            75%       { transform: rotate(5deg) scale(1.05); }
+        }
+
+        @keyframes bombGlow {
+            0%   { filter: sepia(1) saturate(5) hue-rotate(340deg) drop-shadow(0 0 6px  rgba(255, 80,  0, 0.5)); }
+            50%  { filter: sepia(1) saturate(8) hue-rotate(350deg) drop-shadow(0 0 22px rgba(255, 140, 0, 1));   }
+            100% { filter: sepia(1) saturate(5) hue-rotate(340deg) drop-shadow(0 0 6px  rgba(255, 80,  0, 0.5)); }
         }
     </style>
 </head>
-
 <body>
-    <h1>💣 Bomba de Palavras 💣</h1>
 
-    <div id="tela-login">
-        <input type="text" id="nome-jogador" placeholder="Digite seu nome">
-        <button onclick="entrarNoJogo()">Entrar no Jogo</button>
-        <div id="status-conexao" style="color: #b71c1c; margin-top: 10px;"></div>
-    </div>
+    <div class="bombs-bg" id="bombs-bg"></div>
 
-    <div id="tela-lobby">
-        <h2 id="status-lobby">Jogadores no Lobby:</h2>
-        <ul id="lista-jogadores"></ul>
-        <button id="btn-iniciar" onclick="pedirParaIniciar()">Iniciar Jogo</button>
-    </div>
+    <div class="container">
+        <h1><span class="bomb-shake">💣</span> <span class="titulo-texto">WORDBOMB</span> <span class="bomb-shake">💣</span></h1>
+        <p class="subtitle">Palavra &nbsp;·&nbsp; Sílaba &nbsp;·&nbsp; Explosão</p>
 
-    <div id="tela-partida">
-        <div id="relogio-bomba">⏱️ <span id="tempo-valor">15</span>s</div>
+        <div id="tela-login" class="card">
+            <div class="divider"></div>
+            <input type="text" id="nome-jogador" placeholder="Digite seu nome de guerreiro..." maxlength="20">
+            <button class="btn-entrar" onclick="entrarNoJogo()">⚡ Entrar na Arena</button>
+            <div id="status-conexao"></div>
+            <div class="divider"></div>
+        </div>
 
-        <div class="vez-texto" id="texto-vez">Aguardando o jogo começar...</div>
-        <div class="silaba-destaque" id="silaba-atual">--</div>
+        <div id="tela-lobby" class="card">
+            <h2 id="status-lobby">💬 Jogadores no Lobby</h2>
+            <ul id="lista-jogadores"></ul>
+            <button id="btn-iniciar" onclick="pedirParaIniciar()">Iniciar Jogo</button>
+        </div>
 
-        <div id="mensagem-erro"></div>
+        <div id="tela-partida" class="card">
+            <div id="relogio-bomba">💣 <span id="tempo-valor">15</span>s</div>
 
-        <div id="area-jogo" style="display: none;">
-            <input type="text" id="input-palavra" placeholder="Digite a palavra..." onkeypress="verificarEnter(event)">
-            <button id="btn-enviar" onclick="enviarPalavra()">Enviar</button>
+            <div class="vez-texto" id="texto-vez">Aguardando o jogo começar...</div>
+            <div class="silaba-destaque" id="silaba-atual">--</div>
+
+            <div id="mensagem-erro"></div>
+
+            <div id="area-jogo" style="display: none;">
+                <input type="text" id="input-palavra" placeholder="Sua palavra..." onkeydown="verificarEnter(event)">
+                <button id="btn-enviar" onclick="enviarPalavra()">➤</button>
+            </div>
         </div>
     </div>
 
     <script>
+
+        const bg = document.getElementById("bombs-bg");
+        for (let i = 0; i < 18; i++) {
+            const b = document.createElement("span");
+            b.classList.add("bomb-float");
+            b.textContent = "💣";
+            b.style.left = Math.random() * 100 + "vw";
+            b.style.fontSize = (1.5 + Math.random() * 2.5) + "rem";
+            b.style.animationDuration = (12 + Math.random() * 20) + "s";
+            b.style.animationDelay = (Math.random() * 20) + "s";
+            bg.appendChild(b);
+        }
+
         let ws;
         let meuNome = "";
 
@@ -170,24 +457,17 @@
                 alert("Falha ao conectar ao servidor WebSocket. Verifique se o servidor Python está rodando e se você abriu o jogo pela URL correta.");
             };
 
-            ws.onclose = (evento) => {
-                if (!evento.wasClean) {
-                    mostrarStatus("Conexão WebSocket fechada antes de entrar no lobby.");
-                }
-            };
-
             ws.onmessage = (evento) => {
                 const dados = JSON.parse(evento.data);
 
                 if (dados.tipo === "atualizacao_jogadores") {
                     atualizarLista(dados.jogadores);
-                    // Se o jogo já começou e o cara está no lobby, esconde o botão de iniciar
                     if (dados.jogo_em_andamento) {
                         document.getElementById("btn-iniciar").style.display = "none";
-                        document.getElementById("status-lobby").textContent = "Partida em andamento! Assista os jogadores:";
+                        document.getElementById("status-lobby").textContent = "⚔️ Partida em andamento!";
                     } else {
                         document.getElementById("btn-iniciar").style.display = "inline-block";
-                        document.getElementById("status-lobby").textContent = "Jogadores no Lobby:";
+                        document.getElementById("status-lobby").textContent = "💬 Jogadores no Lobby";
                     }
                 }
                 else if (dados.tipo === "nova_rodada") {
@@ -197,7 +477,6 @@
                     document.getElementById("silaba-atual").textContent = dados.silaba;
                     document.getElementById("mensagem-erro").textContent = "";
 
-                    // Reseta visual da bomba
                     const divBomba = document.getElementById("relogio-bomba");
                     divBomba.classList.remove("bomba-perigo");
                     document.getElementById("tempo-valor").textContent = "15";
@@ -208,43 +487,57 @@
 
                     if (dados.jogador_da_vez === meuNome) {
                         divVez.textContent = "🔥 É A SUA VEZ! 🔥";
-                        divVez.style.color = "red";
-                        areaJogo.style.display = "block";
+                        divVez.style.color = "#ff6b35";
+                        areaJogo.style.display = "flex";
                         inputPalavra.value = "";
                         inputPalavra.focus();
                     } else {
-                        divVez.textContent = "Vez de: " + dados.jogador_da_vez;
-                        divVez.style.color = "#1976d2";
+                        divVez.textContent = "⏳ Vez de: " + dados.jogador_da_vez;
+                        divVez.style.color = "#5b8cd6";
                         areaJogo.style.display = "none";
                     }
                 }
-                // NOVO: Atualiza o relógio a cada segundo
                 else if (dados.tipo === "tick") {
                     const spanTempo = document.getElementById("tempo-valor");
                     const divBomba = document.getElementById("relogio-bomba");
                     spanTempo.textContent = dados.tempo;
-
                     if (dados.tempo <= 5) {
-                        divBomba.classList.add("bomba-perigo"); // Fica vermelho piscando!
+                        divBomba.classList.add("bomba-perigo");
                     }
                 }
-                // NOVO: Alguém não digitou a tempo
                 else if (dados.tipo === "explosao") {
                     alert("💥 KABOOM! " + dados.eliminado + " explodiu!");
-                    // Se fui eu que explodi, não posso mais digitar
                     if (dados.eliminado === meuNome) {
                         document.getElementById("area-jogo").style.display = "none";
                     }
                 }
-                // NOVO: Sobrou só um jogador
                 else if (dados.tipo === "fim_de_jogo") {
                     alert("🏆 FIM DE JOGO! O vencedor foi: " + dados.vencedor);
-                    // Volta as telas para o estado de Lobby
                     document.getElementById("tela-partida").style.display = "none";
                     document.getElementById("tela-lobby").style.display = "block";
                 }
                 else if (dados.tipo === "erro_jogada") {
-                    document.getElementById("mensagem-erro").textContent = dados.mensagem;
+                    const msgErro = document.getElementById("mensagem-erro");
+                    const inputPalavra = document.getElementById("input-palavra");
+
+                    msgErro.textContent = "⚠️ " + dados.mensagem;
+
+                    msgErro.classList.remove("erro-flash");
+                    inputPalavra.classList.remove("input-shake");
+
+                    void msgErro.offsetWidth;
+                    void inputPalavra.offsetWidth;
+
+                    msgErro.classList.add("erro-flash");
+                    inputPalavra.classList.add("input-shake");
+
+                    inputPalavra.value = "";
+                    inputPalavra.focus();
+
+                    setTimeout(() => {
+                        msgErro.classList.remove("erro-flash");
+                        inputPalavra.classList.remove("input-shake");
+                    }, 450);
                 }
                 else if (dados.tipo === "erro") {
                     alert(dados.mensagem);
@@ -285,5 +578,4 @@
         }
     </script>
 </body>
-
 </html>

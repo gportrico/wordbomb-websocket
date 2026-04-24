@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bomba de Palavras</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            margin-top: 50px;
+            background-color: #f4f4f9;
+        }
+
+        #tela-lobby,
+        #tela-partida {
+            display: none;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            font-size: 1.2em;
+            margin: 5px 0;
+            color: #333;
+        }
+
+        .silaba-destaque {
+            font-size: 5em;
+            font-weight: bold;
+            color: #d32f2f;
+            margin: 10px 0;
+            text-transform: uppercase;
+        }
+
+        .vez-texto {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #1976d2;
+        }
+
+        #btn-iniciar {
+            padding: 10px 20px;
+            font-size: 1.1em;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        /* Estilo do relógio da bomba */
+        #relogio-bomba {
+            font-size: 3em;
+            font-weight: bold;
+            color: #333;
+            margin: 20px 0;
+        }
+
+        .bomba-perigo {
+            color: red !important;
+            animation: piscar 0.5s infinite;
+        }
+
+        @keyframes piscar {
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        #area-jogo {
+            margin-top: 20px;
+        }
+
+        #input-palavra {
+            padding: 10px;
+            font-size: 1.2em;
+            text-transform: uppercase;
+            width: 200px;
+        }
+
+        #btn-enviar {
+            padding: 10px 20px;
+            font-size: 1.2em;
+            cursor: pointer;
+        }
+
+        #mensagem-erro {
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+            min-height: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>💣 Bomba de Palavras 💣</h1>
+
+    <div id="tela-login">
+        <input type="text" id="nome-jogador" placeholder="Digite seu nome">
+        <button onclick="entrarNoJogo()">Entrar no Jogo</button>
+        <div id="status-conexao" style="color: #b71c1c; margin-top: 10px;"></div>
+    </div>
+
+    <div id="tela-lobby">
+        <h2 id="status-lobby">Jogadores no Lobby:</h2>
+        <ul id="lista-jogadores"></ul>
+        <button id="btn-iniciar" onclick="pedirParaIniciar()">Iniciar Jogo</button>
+    </div>
+
+    <div id="tela-partida">
+        <div id="relogio-bomba">⏱️ <span id="tempo-valor">15</span>s</div>
+
+        <div class="vez-texto" id="texto-vez">Aguardando o jogo começar...</div>
+        <div class="silaba-destaque" id="silaba-atual">--</div>
+
+        <div id="mensagem-erro"></div>
+
+        <div id="area-jogo" style="display: none;">
+            <input type="text" id="input-palavra" placeholder="Digite a palavra..." onkeypress="verificarEnter(event)">
+            <button id="btn-enviar" onclick="enviarPalavra()">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let meuNome = "";
+
+        function mostrarStatus(mensagem) {
+            document.getElementById("status-conexao").textContent = mensagem;
+        }
+
+        function entrarNoJogo() {
+            const nomeInput = document.getElementById("nome-jogador").value.trim();
+            if (!nomeInput) {
+                alert("Por favor, digite um nome!");
+                return;
+            }
+
+            meuNome = nomeInput;
+            mostrarStatus("Conectando ao servidor...");
+
+            const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+            const hostname = location.hostname || "localhost";
+
+            try {
+                ws = new WebSocket(`${wsProtocol}//${hostname}:8765`);
+            } catch (erro) {
+                console.error("Erro ao criar WebSocket:", erro);
+                mostrarStatus("Não foi possível iniciar a conexão WebSocket.");
+                alert("Falha ao iniciar WebSocket. Verifique se você abriu o jogo por HTTP e se o endereço do servidor está correto.");
+                return;
+            }
+
+            ws.onopen = () => {
+                mostrarStatus("Conectado! Entrando no lobby...");
+                ws.send(JSON.stringify({ tipo: "entrar", nome: meuNome }));
+                document.getElementById("tela-login").style.display = "none";
+                document.getElementById("tela-lobby").style.display = "block";
+            };
+
+            ws.onerror = (erro) => {
+                console.error("Erro WebSocket:", erro);
+                mostrarStatus("Erro ao conectar ao servidor WebSocket.");
+                alert("Falha ao conectar ao servidor WebSocket. Verifique se o servidor Python está rodando e se você abriu o jogo pela URL correta.");
+            };
+
+            ws.onclose = (evento) => {
+                if (!evento.wasClean) {
+                    mostrarStatus("Conexão WebSocket fechada antes de entrar no lobby.");
+                }
+            };
+
+            ws.onmessage = (evento) => {
+                const dados = JSON.parse(evento.data);
+
+                if (dados.tipo === "atualizacao_jogadores") {
+                    atualizarLista(dados.jogadores);
+                    // Se o jogo já começou e o cara está no lobby, esconde o botão de iniciar
+                    if (dados.jogo_em_andamento) {
+                        document.getElementById("btn-iniciar").style.display = "none";
+                        document.getElementById("status-lobby").textContent = "Partida em andamento! Assista os jogadores:";
+                    } else {
+                        document.getElementById("btn-iniciar").style.display = "inline-block";
+                        document.getElementById("status-lobby").textContent = "Jogadores no Lobby:";
+                    }
+                }
+                else if (dados.tipo === "nova_rodada") {
+                    document.getElementById("tela-lobby").style.display = "none";
+                    document.getElementById("tela-partida").style.display = "block";
+
+                    document.getElementById("silaba-atual").textContent = dados.silaba;
+                    document.getElementById("mensagem-erro").textContent = "";
+
+                    // Reseta visual da bomba
+                    const divBomba = document.getElementById("relogio-bomba");
+                    divBomba.classList.remove("bomba-perigo");
+                    document.getElementById("tempo-valor").textContent = "15";
+
+                    const divVez = document.getElementById("texto-vez");
+                    const areaJogo = document.getElementById("area-jogo");
+                    const inputPalavra = document.getElementById("input-palavra");
+
+                    if (dados.jogador_da_vez === meuNome) {
+                        divVez.textContent = "🔥 É A SUA VEZ! 🔥";
+                        divVez.style.color = "red";
+                        areaJogo.style.display = "block";
+                        inputPalavra.value = "";
+                        inputPalavra.focus();
+                    } else {
+                        divVez.textContent = "Vez de: " + dados.jogador_da_vez;
+                        divVez.style.color = "#1976d2";
+                        areaJogo.style.display = "none";
+                    }
+                }
+                // NOVO: Atualiza o relógio a cada segundo
+                else if (dados.tipo === "tick") {
+                    const spanTempo = document.getElementById("tempo-valor");
+                    const divBomba = document.getElementById("relogio-bomba");
+                    spanTempo.textContent = dados.tempo;
+
+                    if (dados.tempo <= 5) {
+                        divBomba.classList.add("bomba-perigo"); // Fica vermelho piscando!
+                    }
+                }
+                // NOVO: Alguém não digitou a tempo
+                else if (dados.tipo === "explosao") {
+                    alert("💥 KABOOM! " + dados.eliminado + " explodiu!");
+                    // Se fui eu que explodi, não posso mais digitar
+                    if (dados.eliminado === meuNome) {
+                        document.getElementById("area-jogo").style.display = "none";
+                    }
+                }
+                // NOVO: Sobrou só um jogador
+                else if (dados.tipo === "fim_de_jogo") {
+                    alert("🏆 FIM DE JOGO! O vencedor foi: " + dados.vencedor);
+                    // Volta as telas para o estado de Lobby
+                    document.getElementById("tela-partida").style.display = "none";
+                    document.getElementById("tela-lobby").style.display = "block";
+                }
+                else if (dados.tipo === "erro_jogada") {
+                    document.getElementById("mensagem-erro").textContent = dados.mensagem;
+                }
+                else if (dados.tipo === "erro") {
+                    alert(dados.mensagem);
+                }
+            };
+
+            ws.onclose = () => {
+                alert("Você foi desconectado do servidor.");
+                location.reload();
+            };
+        }
+
+        function pedirParaIniciar() {
+            ws.send(JSON.stringify({ tipo: "iniciar_jogo" }));
+        }
+
+        function enviarPalavra() {
+            const palavra = document.getElementById("input-palavra").value.trim();
+            if (palavra) {
+                ws.send(JSON.stringify({ tipo: "tentativa_palavra", palavra: palavra }));
+            }
+        }
+
+        function verificarEnter(event) {
+            if (event.key === "Enter") {
+                enviarPalavra();
+            }
+        }
+
+        function atualizarLista(jogadores) {
+            const ul = document.getElementById("lista-jogadores");
+            ul.innerHTML = "";
+            jogadores.forEach(nome => {
+                const li = document.createElement("li");
+                li.textContent = "🎮 " + nome + (nome === meuNome ? " (Você)" : "");
+                ul.appendChild(li);
+            });
+        }
+    </script>
+</body>
+
+</html>
